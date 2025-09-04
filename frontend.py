@@ -1,15 +1,6 @@
 import os
 import streamlit as st
 from huggingface_hub import InferenceClient
-from dotenv import load_dotenv
-
-# --------------------------------------------------
-# LOAD ENV VARIABLES
-# --------------------------------------------------
-load_dotenv()  # loads from .env file (not pushed to GitHub)
-
-HF_TOKEN = os.getenv("HF_TOKEN")  # secret is stored in environment
-MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
 
 # --------------------------------------------------
 # PAGE CONFIG
@@ -20,6 +11,16 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="expanded"
 )
+
+# 🔑 Hugging Face token (loaded from environment, not hardcoded)
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+if not HF_TOKEN:
+    st.error("❌ Hugging Face token not found. Please set HF_TOKEN as a secret/environment variable.")
+    st.stop()
+
+# 🎯 Model (Zephyr supports conversational mode)
+MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
 
 # --------------------------------------------------
 # CLIENT
@@ -126,12 +127,25 @@ if user_input:
         try:
             client = get_client()
 
+            # Strong system prompt
             messages = [
-                {"role": "system", "content": "You are FinSmart, a professional personal-finance advisor. Keep answers concise, no more than 120 words."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are FinSmart, a professional personal-finance advisor. HARD RULES:\n"
+                        "1) Always tailor the answer to the user’s exact question (investing can mean stocks, crypto, real estate, bonds, retirement, etc.).\n"
+                        "2) Answer concisely — max 3 short paragraphs or ~120 words.\n"
+                        "3) If listing steps, give at most 5 numbered steps.\n"
+                        "4) Do NOT invent facts. If unsure, say 'I may be unsure' and give a best-effort concise answer.\n"
+                        "5) Never ask a clarifying question—just provide a brief best-effort reply.\n"
+                        "6) Avoid long examples; default to 2–3 short bullets when helpful.\n"
+                        "7) Only mention retirement accounts if the user explicitly asks about retirement."
+                    ),
+                },
                 {"role": "user", "content": user_input},
             ]
 
-            resp = client.chat_completion(
+            resp = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages,
                 max_tokens=140,
@@ -140,6 +154,10 @@ if user_input:
             )
 
             cleaned_response = resp.choices[0].message["content"].strip()
+
+            MAX_CHARS = 700
+            if len(cleaned_response) > MAX_CHARS:
+                cleaned_response = cleaned_response[:MAX_CHARS].rsplit(" ", 1)[0] + "…"
 
             st.session_state.messages.append({"role": "assistant", "content": cleaned_response})
             st.markdown(f'<div class="bot-message">🤖 <strong>FinSmart:</strong> {cleaned_response}</div>', unsafe_allow_html=True)
