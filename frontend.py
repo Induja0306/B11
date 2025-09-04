@@ -1,5 +1,5 @@
-import os
 import streamlit as st
+import os
 from huggingface_hub import InferenceClient
 
 # --------------------------------------------------
@@ -12,12 +12,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 🔑 Hugging Face token (loaded from environment, not hardcoded)
-HF_TOKEN = os.getenv("HF_TOKEN")
-
-if not HF_TOKEN:
-    st.error("❌ Hugging Face token not found. Please set HF_TOKEN as a secret/environment variable.")
-    st.stop()
+# 🔑 Hugging Face token (loaded from secrets or env)
+HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
 
 # 🎯 Model (Zephyr supports conversational mode)
 MODEL_NAME = "HuggingFaceH4/zephyr-7b-beta"
@@ -47,8 +43,6 @@ st.markdown("""
     .stButton>button:hover { background-color: #1c6cb0; color: white; }
     .budget-card { background-color: #ffffff; padding: 15px; border-radius: 10px; margin: 10px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .feature-card { background-color: #f8f9fa; padding: 15px; border-radius: 10px; margin: 10px 0; border-left: 4px solid #2e86de; }
-    .example-prompt { background-color: #e3f2fd; padding: 10px; border-radius: 8px; margin: 8px 0; cursor: pointer; border-left: 3px solid #2e86de; }
-    .example-prompt:hover { background-color: #bbdefb; }
     .model-info { background-color: #f1f8ff; padding: 10px; border-radius: 8px; margin: 10px 0; }
     .css-1d391kg { display: none; }
 </style>
@@ -67,10 +61,8 @@ with st.sidebar:
     st.markdown('<div class="sidebar-header">FinGuide</div>', unsafe_allow_html=True)
 
     st.markdown("### ⚙️ Model Information")
-    st.markdown('<div class="model-info">', unsafe_allow_html=True)
     st.markdown(f"**Current Model:** {MODEL_NAME}")
     st.markdown("A powerful financial AI assistant specialized in personal finance topics.")
-    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### 📊 Budget Planner")
@@ -86,94 +78,4 @@ with st.sidebar:
             <h4>Your Financial Summary</h4>
             <p><strong>Income:</strong> ${income:,}</p>
             <p><strong>Expenses:</strong> ${expenses:,}</p>
-            <p><strong>Savings:</strong> ${savings:,} ({savings_percent:.1f}%)</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if savings < 0:
-            st.error("You're spending more than you earn! Consider reducing expenses.")
-        elif savings_percent < 20:
-            st.warning("Try to save at least 20% of your income for better financial health.")
-        else:
-            st.success("Great job! You're saving a healthy portion of your income.")
-
-    st.markdown("---")
-    st.markdown("### 💡 Financial Tips")
-    st.markdown("""<div class="feature-card"><strong>Emergency Fund</strong><p>Save 3-6 months of expenses for emergencies</p></div>""", unsafe_allow_html=True)
-    st.markdown("""<div class="feature-card"><strong>50/30/20 Rule</strong><p>50% needs, 30% wants, 20% savings/investments</p></div>""", unsafe_allow_html=True)
-    st.markdown("""<div class="feature-card"><strong>Debt Management</strong><p>Pay off high-interest debt first</p></div>""", unsafe_allow_html=True)
-
-# --------------------------------------------------
-# MAIN CONTENT
-# --------------------------------------------------
-st.markdown('<h1 class="main-header">Personal Finance Chatbot</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Your AI-powered personal finance assistant</p>', unsafe_allow_html=True)
-
-# Display chat history
-for message in st.session_state.messages:
-    if message["role"] == "user":
-        st.markdown(f'<div class="user-message">👤 <strong>You:</strong> {message["content"]}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="bot-message">🤖 <strong>FinSmart:</strong> {message["content"]}</div>', unsafe_allow_html=True)
-
-# Chat input
-user_input = st.chat_input("💡 Ask about savings, budgeting, investments...")
-
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    st.markdown(f'<div class="user-message">👤 <strong>You:</strong> {user_input}</div>', unsafe_allow_html=True)
-
-    with st.spinner("FinSmart is analyzing your query..."):
-        try:
-            client = get_client()
-
-            # Strong system prompt
-            messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are FinSmart, a professional personal-finance advisor. HARD RULES:\n"
-                        "1) Always tailor the answer to the user’s exact question (investing can mean stocks, crypto, real estate, bonds, retirement, etc.).\n"
-                        "2) Answer concisely — max 3 short paragraphs or ~120 words.\n"
-                        "3) If listing steps, give at most 5 numbered steps.\n"
-                        "4) Do NOT invent facts. If unsure, say 'I may be unsure' and give a best-effort concise answer.\n"
-                        "5) Never ask a clarifying question—just provide a brief best-effort reply.\n"
-                        "6) Avoid long examples; default to 2–3 short bullets when helpful.\n"
-                        "7) Only mention retirement accounts if the user explicitly asks about retirement."
-                    ),
-                },
-                {"role": "user", "content": user_input},
-            ]
-
-            resp = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                max_tokens=140,
-                temperature=0.15,
-                top_p=0.9
-            )
-
-            cleaned_response = resp.choices[0].message["content"].strip()
-
-            MAX_CHARS = 700
-            if len(cleaned_response) > MAX_CHARS:
-                cleaned_response = cleaned_response[:MAX_CHARS].rsplit(" ", 1)[0] + "…"
-
-            st.session_state.messages.append({"role": "assistant", "content": cleaned_response})
-            st.markdown(f'<div class="bot-message">🤖 <strong>FinSmart:</strong> {cleaned_response}</div>', unsafe_allow_html=True)
-
-        except Exception as e:
-            error_msg = "I’m having technical difficulties. Please try again later."
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
-            st.error(f"Error: {str(e)}")
-
-# --------------------------------------------------
-# FOOTER
-# --------------------------------------------------
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: #6c757d; font-size: 0.9rem;">
-    <p>FinGuide Chatbot • Powered by HuggingFaceH4/zephyr-7b-beta • Your financial wellness partner</p>
-    <p>Disclaimer: This is an AI assistant. For personalized financial advice, consult a certified financial planner.</p>
-</div>
-""", unsafe_allow_html=True)
+            <p><strong>Savings:</strong> ${savings:,} ({savings_perc_
