@@ -131,7 +131,7 @@ if user_input:
                 {"role": "user", "content": user_input},
             ]
 
-            resp = client.chat.completions.create(
+            resp = client.chat_completion(
                 model=MODEL_NAME,
                 messages=messages,
                 max_tokens=140,
