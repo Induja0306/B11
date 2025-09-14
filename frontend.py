@@ -99,9 +99,7 @@ if "messages" not in st.session_state:
 # --------------------------------------------------
 with st.sidebar:
     st.markdown('<div class="sidebar-header">FinGuide</div>', unsafe_allow_html=True)
-
-    st.markdown("### ⚙️ Model Information")
-    st.markdown(f"**Current Model:** {MODEL_NAME}")
+    st.markdown(f"**Current Model:** OpenAI GPT-4o-mini")
     st.markdown("A powerful financial AI assistant specialized in personal finance topics.")
 
     st.markdown("---")
@@ -218,3 +216,4 @@ st.markdown("""
     <p>Disclaimer: This is an AI assistant. For personalized financial advice, consult a certified financial planner.</p>
 </div>
 """, unsafe_allow_html=True)
+
